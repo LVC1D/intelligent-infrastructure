@@ -1,0 +1,21 @@
+[package]
+name = "knowledge-search"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+[lints]
+workspace = true
+
+[dependencies]
+ndarray = "0.16"  # For vector operations
+serde = { workspace = true }
+anyhow = { workspace = true }
+
+[dev-dependencies]
+criterion = "0.5"  # Benchmarking (Week 6 skill)
+
+[[bench]]
+name = "similarity"
+harness = false
