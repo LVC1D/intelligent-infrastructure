@@ -1,3 +1,13 @@
+pub mod python;
+
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum VectorStoreError {
+    #[error("dimension mismatch: expected {expected}, got {actual}")]
+    DimensionMismatch { expected: usize, actual: usize },
+}
+
 pub struct VectorStore {
     dimensions: usize,
     data: Vec<f32>,
@@ -25,15 +35,18 @@ impl VectorStore {
     }
 
     /// Add a vector to the store. Returns its index.
-    /// Panics if vector length != dimensions
-    #[must_use]
-    #[allow(clippy::must_use_candidate)]
-    #[allow(clippy::missing_panics_doc)]
-    pub fn add(&mut self, vector: &[f32]) -> usize {
-        assert!(
-            vector.len() == self.dimensions,
-            "The passed-in vector's length doens't correspond to the dimensions size"
-        );
+    ///
+    /// # Errors
+    ///
+    /// Returns an Error at runtime (PyO3-friendly)
+    /// that signifies mismatch of the vector's dimensions
+    pub fn add(&mut self, vector: &[f32]) -> Result<usize, VectorStoreError> {
+        if vector.len() != self.dimensions {
+            return Err(VectorStoreError::DimensionMismatch {
+                expected: self.dimensions,
+                actual: vector.len(),
+            });
+        }
         let idx = self.count;
 
         for &x in vector {
@@ -42,15 +55,25 @@ impl VectorStore {
         self.norms.push(compute_norm(vector));
         self.count += 1;
 
-        idx
+        Ok(idx)
     }
 
     /// Search for top-k most similar vectors to query
     /// Returns results sorted by similarity (highest first)
-    #[must_use]
-    #[allow(clippy::must_use_candidate)]
+    ///
+    /// # Errors
+    ///
+    /// Returns an Error at runtime (PyO3-friendly)
+    /// that signifies mismatch of the vector's dimensions
     #[allow(clippy::missing_panics_doc)]
-    pub fn search(&self, query: &[f32], k: usize) -> Vec<SearchResult> {
+    pub fn search(&self, query: &[f32], k: usize) -> Result<Vec<SearchResult>, VectorStoreError> {
+        if query.len() != self.dimensions {
+            return Err(VectorStoreError::DimensionMismatch {
+                expected: self.dimensions,
+                actual: query.len(),
+            });
+        }
+
         let query_norm = compute_norm(query);
         let mut res: Vec<SearchResult> = vec![];
 
@@ -71,7 +94,7 @@ impl VectorStore {
         res.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap());
         res.truncate(k);
 
-        res
+        Ok(res)
     }
 }
 
@@ -107,19 +130,19 @@ mod tests {
         // Add another, check it returns index 1
         let mut store = VectorStore::new(3);
 
-        assert_eq!(store.add(&[3.5, 4.7, 6.8]), 0);
-        assert_eq!(store.add(&[3.5, 4.7, 6.8]), 1);
+        assert_eq!(store.add(&[3.5, 4.7, 6.8]).unwrap(), 0);
+        assert_eq!(store.add(&[3.5, 4.7, 6.8]).unwrap(), 1);
     }
 
     #[test]
     #[should_panic(
-        expected = "The passed-in vector's length doens't correspond to the dimensions size"
+        expected = "called `Result::unwrap()` on an `Err` value: DimensionMismatch { expected: 4, actual: 3 }"
     )]
     fn test_add_wrong_dimensions() {
         // Try to add vector with wrong dimensions
         let mut store = VectorStore::new(4);
 
-        assert_eq!(store.add(&[3.5, 4.7, 6.8]), 0);
+        assert_eq!(store.add(&[3.5, 4.7, 6.8]).unwrap(), 0);
     }
 
     #[test]
@@ -129,8 +152,8 @@ mod tests {
         let mut store = VectorStore::new(3);
         let vec = vec![3.5, 4.7, 6.8];
 
-        let _ = store.add(&vec);
-        let res = store.search(&vec, 1); // ← Search with the vector itself
+        let _ = store.add(&vec).unwrap();
+        let res = store.search(&vec, 1).unwrap(); // ← Search with the vector itself
 
         assert_eq!(res.len(), 1);
         assert_eq!(res[0].index, 0);
@@ -146,7 +169,7 @@ mod tests {
         let _ = store.add(&[4.5, 4.1, 1.8]);
         let _ = store.add(&[1.5, 2.7, 1.7]);
 
-        let res = store.search(&[4.2, 3.5, 1.0], 3);
+        let res = store.search(&[4.2, 3.5, 1.0], 3).unwrap();
         assert_relative_eq!(
             res[0].similarity,
             cosine_similarity(
@@ -178,7 +201,7 @@ mod tests {
         let _ = store.add(&[1.5, 2.7, 1.7]);
         let _ = store.add(&[3.7, 9.7, 12.7]);
         let _ = store.add(&[8.5, 4.9, 4.0]);
-        let res = store.search(&[4.2, 3.5, 1.0], 2);
+        let res = store.search(&[4.2, 3.5, 1.0], 2).unwrap();
 
         assert_eq!(res.len(), 2);
     }
