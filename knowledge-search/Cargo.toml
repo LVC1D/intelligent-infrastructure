@@ -24,3 +24,4 @@ approx = "0.5"
 [[bench]]
 name = "similarity"
 harness = false
+

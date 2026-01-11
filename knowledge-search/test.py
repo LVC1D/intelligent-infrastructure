@@ -2,6 +2,7 @@
 """Quick smoke test for Rust FFI boundary"""
 
 from knowledge_search import VectorStore
+from knowledge_search_py import dosctore
 
 
 def test_basic_operations():
@@ -76,6 +77,13 @@ def test_similarity_correctness():
     print(f"✓ Orthogonal vectors have similarity={orthogonal_sim:.6f}")
 
     print("Similarity math is correct! ✓")
+
+
+def test_docstore_initialized():
+    store = dosctore.DocStore()
+    store.add_document("prompt one")
+    store.add_document("prompt two")
+    assert len(store) == 2
 
 
 if __name__ == "__main__":
