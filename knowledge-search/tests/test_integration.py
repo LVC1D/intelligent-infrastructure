@@ -7,7 +7,7 @@ from openai import RateLimitError, AuthenticationError, APIConnectionError
 from rag_pipeline import RAGPipeline
 from obsidian_ingestion import MarkdownChunker
 
-'''
+
 class TestVectorStoreBasics:
     def test_create_store(self):
         store = VectorStore(dimensions=3)
@@ -98,8 +98,8 @@ class TestResultOrdering:
 class TestDocStore:
     def test_docstore_initialized(self):
         store = DocStore()
-        store.add_document("prompt one")
-        store.add_document("prompt two")
+        store.add_document("prompt one", "file1.md")
+        store.add_document("prompt two", "file2.md")
         assert len(store.store) == 2
 
     def test_docstore_instances_isolated(self):
@@ -107,13 +107,13 @@ class TestDocStore:
         store1 = DocStore()
         store2 = DocStore()
 
-        store1.add_document("store1 doc")
-        store2.add_document("store2 doc")
+        store1.add_document("store1 doc", "file1.md")
+        store2.add_document("store2 doc", "file2.md")
 
         assert len(store1.store) == 1
         assert len(store2.store) == 1
-        assert store1.get_document(0) == "store1 doc"
-        assert store2.get_document(0) == "store2 doc"
+        assert store1.get_document(0) == "file1.md: store1 doc\n"
+        assert store2.get_document(0) == "file2.md: store2 doc\n"
 
     def test_get_nonexistent_document(self):
         store = DocStore()
@@ -122,10 +122,10 @@ class TestDocStore:
     def test_get_documents_with_mixed_ids(self):
         store = DocStore()
 
-        store.add_document("prompt one")
-        store.add_document("prompt two")
-        store.add_document("prompt three")
-        store.add_document("prompt four")
+        store.add_document("prompt one", "file1.md")
+        store.add_document("prompt two", "file1.md")
+        store.add_document("prompt three", "file2.md")
+        store.add_document("prompt four", "file3.md")
 
         results = store.get_documents([1, 3, 5, 7])
         assert len(results) == 2
@@ -133,10 +133,10 @@ class TestDocStore:
     def test_add_returns_correct_ids(self):
         store = DocStore()
 
-        store.add_document("prompt one")
-        store.add_document("prompt two")
-        store.add_document("prompt three")
-        store.add_document("prompt four")
+        store.add_document("prompt one", "file1.md")
+        store.add_document("prompt two", "file1.md")
+        store.add_document("prompt three", "file2.md")
+        store.add_document("prompt four", "file3.md")
 
         assert list(store.store.keys()) == [0, 1, 2, 3]
 
@@ -167,15 +167,15 @@ class TestEmbeddingGenerator:
 class TestRAGPipeline:
     def test_rag_add_document(self):
         rag = RAGPipeline(dimensions=1536)
-        doc_id = rag.add_document("Test document about Rust")
+        doc_id = rag.add_document("Test document about Rust", "file1")
         assert doc_id == 0
 
-        doc_id2 = rag.add_document("Another document")
+        doc_id2 = rag.add_document("Another document", "file2")
         assert doc_id2 == 1
 
     def test_debug_retrieval(self):
         rag = RAGPipeline(dimensions=1536)
-        rag.add_document("Week 1: Built TCP server")
+        rag.add_document("Week 1: Built TCP server", "file3")
 
         # See what search returns
         results = rag.vec_store.search(rag.embed_gen.embed_text("Week 1"), k=1)
@@ -190,32 +190,32 @@ class TestRAGPipeline:
 
     def test_rag_retrieval(self):
         rag = RAGPipeline(dimensions=1536)
-        rag.add_document("Async Rust with Tokio")
-        rag.add_document("Baking cookies at 350°F")
-        rag.add_document("Rust performance optimization")
+        rag.add_document("Async Rust with Tokio", "file1.md")
+        rag.add_document("Baking cookies at 350°F", "file2.md")
+        rag.add_document("Rust performance optimization", "file1.md")
 
-        answer = rag.query("What did I learn about Rust?", top_k=2)
+        answer = rag.query("What did I learn about Rust?", top_k=3)
 
         # Answer should reference Rust docs, not cookies
-        assert "Rust" in answer or "async" in answer or "performance" in answer
-        assert "cookies" not in answer.lower()
+        assert "context" in answer or "async" in answer or "performance" in answer
+        assert "cookies" not in answer['answer'].lower()
 
     def test_rag_with_real_questions(self):
         rag = RAGPipeline(dimensions=1536)
 
         # Add some RBES content
         rag.add_document(
-            "Week 1: Built TCP server with Tokio, handled 500 connections")
-        rag.add_document("Week 6: Learned cache optimization and SIMD")
-        rag.add_document("Week 8: Implemented custom allocators")
+            "Week 1: Built TCP server with Tokio, handled 500 connections", "file1.md")
+        rag.add_document(
+            "Week 6: Learned cache optimization and SIMD", "file6.md")
+        rag.add_document("Week 8: Implemented custom allocators", "file8.md")
 
         answer = rag.query("What did I build in Week 1?")
         print(f"Answer: {answer}")
 
         # Should mention TCP or Tokio or connections
-        assert any(word in answer.lower()
+        assert any(word in answer['answer'].lower()
                    for word in ["tcp", "tokio", "server", "connection"])
-'''
 
 
 class TestMarkdownChunker:

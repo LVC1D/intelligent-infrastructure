@@ -13,9 +13,9 @@ class RAGPipeline:
         self.embed_gen = EmbeddingGenerator()
         self.ai_client = openai.OpenAI()
 
-    def add_document(self, text: str) -> int:
+    def add_document(self, text: str, source: str) -> int:
         embedding = self.embed_gen.embed_text(text)
-        doc_id = self.doc_store.add_document(text)
+        doc_id = self.doc_store.add_document(text, source)
         vec_idx = self.vec_store.add(embedding)
         assert doc_id == vec_idx
         return doc_id
