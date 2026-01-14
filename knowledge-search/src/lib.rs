@@ -1,5 +1,7 @@
 pub mod python;
 
+use std::cmp::Reverse;
+use std::collections::BinaryHeap;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -13,6 +15,14 @@ pub struct VectorStore {
     data: Vec<f32>,
     norms: Vec<f32>,
     count: usize,
+}
+
+impl Eq for SearchResult {}
+
+impl Ord for SearchResult {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.similarity.partial_cmp(&other.similarity).unwrap()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
@@ -75,7 +85,7 @@ impl VectorStore {
         }
 
         let query_norm = compute_norm(query);
-        let mut res: Vec<SearchResult> = vec![];
+        let mut min_heap = BinaryHeap::new();
 
         for i in 0..self.count {
             let cos_sim = cosine_similarity(
@@ -85,14 +95,17 @@ impl VectorStore {
                 self.norms[i],
             );
 
-            res.push(SearchResult {
+            min_heap.push(Reverse(SearchResult {
                 index: i,
                 similarity: cos_sim,
-            });
+            }));
+            if min_heap.len() > k {
+                let _ = min_heap.pop();
+            }
         }
 
-        res.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap());
-        res.truncate(k);
+        let mut res: Vec<SearchResult> = min_heap.into_vec().into_iter().map(|r| r.0).collect();
+        res.sort_by(|first, second| second.cmp(first));
 
         Ok(res)
     }
@@ -169,12 +182,15 @@ mod tests {
         let _ = store.add(&[4.5, 4.1, 1.8]);
         let _ = store.add(&[1.5, 2.7, 1.7]);
 
-        let res = store.search(&[4.2, 3.5, 1.0], 3).unwrap();
+        let query_vec = &[4.2, 3.5, 1.0];
+
+        let res = store.search(query_vec, 3).unwrap();
+
         assert_relative_eq!(
             res[0].similarity,
             cosine_similarity(
-                &[4.2, 3.5, 1.0],
-                compute_norm(&[4.2, 3.5, 1.0]),
+                query_vec,
+                compute_norm(query_vec),
                 &[4.5, 4.1, 1.8],
                 compute_norm(&[4.5, 4.1, 1.8])
             )
@@ -182,8 +198,8 @@ mod tests {
         assert_relative_eq!(
             res[2].similarity,
             cosine_similarity(
-                &[4.2, 3.5, 1.0],
-                compute_norm(&[4.2, 3.5, 1.0]),
+                query_vec,
+                compute_norm(query_vec),
                 &[3.5, 4.7, 6.8],
                 compute_norm(&[3.5, 4.7, 6.8])
             )

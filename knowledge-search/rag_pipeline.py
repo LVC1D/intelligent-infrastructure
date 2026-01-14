@@ -20,16 +20,14 @@ class RAGPipeline:
         assert doc_id == vec_idx
         return doc_id
 
-    def query(self, question: str, top_k: int = 3) -> str:
+    def query(self, question: str, top_k: int = 3) -> dict:
         embedded_question = self.embed_gen.embed_text(question)
         results = self.vec_store.search(embedded_question, top_k)
 
         retrieved_docs = [item.index for item in results]
 
         retrieved_texts = self.doc_store.get_documents(retrieved_docs)
-
-        if not retrieved_texts:
-            return "I don't have any relevant information to answer that question."
+        answer = ""
 
         system_prompt = """
         You are a helpful assistant.
@@ -56,4 +54,13 @@ class RAGPipeline:
             ]
         )
 
-        return response.choices[0].message.content
+        if not retrieved_texts:
+            answer = "I don't have any relevant information to answer that question."
+        else:
+            answer = response.choices[0].message.content
+
+        return {
+            "answer": answer,
+            "context": retrieved_texts,  # The list of chunk strings
+            "query": question
+        }

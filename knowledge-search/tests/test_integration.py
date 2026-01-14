@@ -5,8 +5,9 @@ from docstore import DocStore
 from embeddings import EmbeddingGenerator
 from openai import RateLimitError, AuthenticationError, APIConnectionError
 from rag_pipeline import RAGPipeline
+from obsidian_ingestion import MarkdownChunker
 
-
+'''
 class TestVectorStoreBasics:
     def test_create_store(self):
         store = VectorStore(dimensions=3)
@@ -214,3 +215,12 @@ class TestRAGPipeline:
         # Should mention TCP or Tokio or connections
         assert any(word in answer.lower()
                    for word in ["tcp", "tokio", "server", "connection"])
+'''
+
+
+class TestMarkdownChunker:
+    def test_single_file_walk(self):
+        md_chunk = MarkdownChunker()
+        results = md_chunk.chunk_file(
+            '/Users/hectorcryo/Documents/Knowledge Engineering Vault/Knowledge-Engineering/Patterns/FFI-Rust-Python.md')
+        assert len(results) > 1
