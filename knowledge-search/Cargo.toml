@@ -15,7 +15,11 @@ ndarray = "0.16"  # For vector operations
 serde = { workspace = true }
 anyhow = { workspace = true }
 thiserror = "2.0.17"
-pyo3 = { version = "0.27.2", features = ["extension-module"] }
+pyo3 = { version = "0.27.2", optional = true }
+
+[features]
+default = ["python"]
+python = ["pyo3"]
 
 [dev-dependencies]
 criterion = "0.5"  # Benchmarking (Week 6 skill)
