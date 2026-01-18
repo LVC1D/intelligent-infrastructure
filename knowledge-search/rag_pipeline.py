@@ -47,7 +47,7 @@ class RAGPipeline:
         """
 
         response = self.ai_client.chat.completions.create(
-            model="gpt-4o-mini",  # Cheap and fast for testing
+            model="gpt-5-mini",  # Cheap and fast for testing
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_message}
