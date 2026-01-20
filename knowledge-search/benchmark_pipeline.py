@@ -80,6 +80,7 @@ def main():
         print(f"LLM gen:     {ll_t}s")
         print(f"Total:       {tt}s")
         print("============")
+    print(rag.embed_gen.get_cache_stats())
 
 
 

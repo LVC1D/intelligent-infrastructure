@@ -224,3 +224,49 @@ class TestMarkdownChunker:
         results = md_chunk.chunk_file(
             '/Users/hectorcryo/Documents/Knowledge Engineering Vault/Knowledge-Engineering/Patterns/FFI-Rust-Python.md')
         assert len(results) > 1
+
+
+class TestEmbeddingCache:
+    def test_cache_hit_on_identical_query(self):
+        embed_gen = EmbeddingGenerator()
+        first = embed_gen.embed_text("rust")
+        second = embed_gen.embed_text("rust")
+ 
+        assert embed_gen.cache_hits == 1
+        assert first == second
+    
+    def test_cache_hit_on_normalized_variants(self):
+        embed_gen = EmbeddingGenerator()
+        first = embed_gen.embed_text("   rust   ")
+        second = embed_gen.embed_text("RUST")
+        third = embed_gen.embed_text("Rust")
+ 
+        assert embed_gen.cache_hits == 2 
+        assert embed_gen.cache_misses == 1 
+        assert first == second
+        assert second == third
+
+    def test_cache_stats_tracking(self):
+        embed_gen = EmbeddingGenerator()
+        first = embed_gen.embed_text("rust")
+        second = embed_gen.embed_text("Python")
+        third = embed_gen.embed_text("RuStPython")
+        fourth = embed_gen.embed_text("pythON")
+
+        stats = embed_gen.get_cache_stats()
+        assert stats["misses"] + stats["hits"] == 4 
+        assert stats["size"] == 3 
+
+    def test_cache_eviction_at_max_size(self):
+        embed_gen = EmbeddingGenerator()
+        embed_gen.cache_max_size = 5 
+        first = embed_gen.embed_text("rust")
+        second = embed_gen.embed_text("Python")
+        third = embed_gen.embed_text("RuStPython")
+        fourth = embed_gen.embed_text("pythORG")
+        fifth = embed_gen.embed_text("stuff")
+        extra = embed_gen.embed_text("dinosaurs!")
+
+        assert len(embed_gen.cache) == 5 
+        assert "rust" not in embed_gen.cache.keys()
+
