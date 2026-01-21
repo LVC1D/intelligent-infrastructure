@@ -5,6 +5,8 @@ from typing import List
 from tqdm import tqdm
 from rag_pipeline import RAGPipeline
 from pathlib import Path
+from concurrent.futures.thread import ThreadPoolExecutor
+import threading
 
 
 def walk_tree(node):
@@ -54,7 +56,7 @@ if __name__ == "__main__":
 
     test_files = [
         "/Users/hectorcryo/Documents/Knowledge Engineering Vault/Knowledge-Engineering/Patterns/FFI-Rust-Python.md",
-        "/Users/hectorcryo/Documents/Knowledge Engineering Vault/Knowledge-Engineering/Concepts/RAG-Systems.md.md",
+        "/Users/hectorcryo/Documents/Knowledge Engineering Vault/Knowledge-Engineering/Concepts/RAG-Systems.md",
         "/Users/hectorcryo/Documents/Knowledge Engineering Vault/Knowledge-Engineering/Concepts/Python Essentials.md"
     ]
 
@@ -104,18 +106,16 @@ class ObsidianIngestion:
                          for i in range(0, len(valid_sources), n)]
 
         with tqdm(total=len(valid_chunks)) as pbar:
-            for sources, chunk in zip(split_sources, split_list):
-                response = self.rag.ai_client.embeddings.create(
-                    model="text-embedding-3-small",
-                    input=chunk
-                )
+            with ThreadPoolExecutor() as executor:
+                print(f"Starting {len(split_list)} batches across 5 threads")
+                all_embeddings = list(executor.map(self.rag.embed_gen.embed_batch, split_list))
+                print(f"Completed all batches")
 
-                for i, item in enumerate(response.data):
-                    embedding = item.embedding
-                    self.rag.vec_store.add(embedding)
-                    self.rag.doc_store.add_document(chunk[i], sources[i])
-
-                pbar.update(len(chunk))
+                for batch_embeddings, sources, chunks in zip(all_embeddings, split_sources, split_list):
+                    for embedding, source, chunk in zip(batch_embeddings, sources, chunks):
+                        self.rag.vec_store.add(embedding)        # Fast: 40µs
+                        self.rag.doc_store.add_document(chunk, source)
+                        pbar.update(1)
 
 
 if __name__ == "__main__":

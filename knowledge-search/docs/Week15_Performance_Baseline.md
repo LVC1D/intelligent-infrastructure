@@ -104,3 +104,43 @@ It appears two components contribute the most to the slowdown of the RAG Pipelin
 - Rust vector search (40µs → even 10x faster saves nothing)
 - Python doc retrieval (6µs → already negligible)
 - HNSW or vector databases (search isn't the bottleneck)
+
+## Day 3: Parallel Batch embedding
+
+I have opted in for the `ThreadPoolExecutor` from the `concurrent.futures` library to add concurrency to our batch-embedding logic. Here are the results:
+
+|   Method   |      Time     |    Throughput    |    Speedup   |
+| ---------- | ------------- | ---------------- | ------------ |
+| Sequential | 1m 55s (115s) | 2.20 chunks/sec  | 11.5x faster |
+| Concurrent |      10s      | 23.21 chunks/sec |      N/A     |  
+
+The code (concurrent):
+```py 
+def _batch_embed_and_add(self, chunks: List[str], source_files: List[str]):
+        valid_chunks = [c for c in chunks if c and c.strip()]
+        valid_sources = [source_files[i] for i in range(
+            len(chunks)) if chunks[i] and chunks[i].strip()]
+
+        if len(valid_chunks) < len(chunks):
+            print(f"Filtered out {len(chunks) -
+                  len(valid_chunks)} empty chunks")
+
+        n = 20
+        split_list = [valid_chunks[i:i + n]
+                      for i in range(0, len(valid_chunks), n)]
+        split_sources = [valid_sources[i:i + n]
+                         for i in range(0, len(valid_sources), n)]
+
+        with tqdm(total=len(valid_chunks)) as pbar:
+            with ThreadPoolExecutor() as executor:
+                print(f"Starting {len(split_list)} batches across 5 threads")
+                all_embeddings = list(executor.map(self.rag.embed_gen.embed_batch, split_list))
+                print(f"Completed all batches")
+
+                for batch_embeddings, sources, chunks in zip(all_embeddings, split_sources, split_list):
+                    for embedding, source, chunk in zip(batch_embeddings, sources, chunks):
+                        self.rag.vec_store.add(embedding)        # Fast: 40µs
+                        self.rag.doc_store.add_document(chunk, source)
+                        pbar.update(1)
+```
+
