@@ -38,6 +38,7 @@ class MarkdownChunker:
         chunk = ""
         for node in doc.children:
             if isinstance(node, Heading) and node.level == 1:
+                chunk += walk_tree(node)
                 continue
 
             if isinstance(node, Heading) and node.level == 2:
@@ -49,21 +50,6 @@ class MarkdownChunker:
         if len(chunk.strip()) > 40:
             chunks.append(chunk)
         return chunks
-
-
-if __name__ == "__main__":
-    chunker = MarkdownChunker()
-
-    test_files = [
-        "/Users/hectorcryo/Documents/Knowledge Engineering Vault/Knowledge-Engineering/Patterns/FFI-Rust-Python.md",
-        "/Users/hectorcryo/Documents/Knowledge Engineering Vault/Knowledge-Engineering/Concepts/RAG-Systems.md",
-        "/Users/hectorcryo/Documents/Knowledge Engineering Vault/Knowledge-Engineering/Concepts/Python Essentials.md"
-    ]
-
-    for filepath in test_files:
-        print(f"\n=== Testing: {filepath} ===")
-        results = chunker.chunk_file(filepath)
-        print(f"Chunks: {len(results)}")
 
 
 class ObsidianIngestion:
@@ -117,6 +103,31 @@ class ObsidianIngestion:
                         self.rag.doc_store.add_document(chunk, source)
                         pbar.update(1)
 
+    
+def debug_query_with_ids(rag: RAGPipeline, query: str, top_k: int = 6) -> list:
+    """Helper to see chunk IDs and their content for ground truth creation"""
+    embedded_question = rag.embed_gen.embed_text(query)
+    results = rag.vec_store.search(embedded_question, top_k)
+   
+    '''
+    print(f"\n{'='*60}")
+    print(f"QUERY: {query}")
+    print(f"{'='*60}\n")
+    '''
+
+    for result in results:
+        chunk_id = result.index
+        chunk_text = rag.doc_store.get_document(chunk_id)
+        
+        '''
+        print(f"Chunk ID: {chunk_id} | Similarity: {result.similarity:.4f}")
+        print(chunk_text)
+        print()
+        '''
+
+    result_ids = [res.index for res in results]
+    return result_ids
+
 
 if __name__ == "__main__":
     from rag_pipeline import RAGPipeline
@@ -131,14 +142,5 @@ if __name__ == "__main__":
     print(stats)
 
     # Verify it worked
-    query = 'How does RAG Pipeline orchestrate the context retrieval?'
-    results = rag.query(query, 6)
-
-    print('QUERY:', query)
-    print('\n=== RETRIEVED CHUNKS ===')
-    for i, chunk in enumerate(results['context'], 1):
-        print(f'\nChunk {i}:')
-        print(chunk[:300] + '...' if len(chunk) > 300 else chunk)
-
-    print('\n=== GENERATED ANSWER ===')
-    print(results['answer'])
+    query = "What are some advanced ways in which I could improve a RAG Pipeline?"
+    debug_query_with_ids(rag, query, top_k=12)    
