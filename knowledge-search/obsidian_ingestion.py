@@ -3,7 +3,7 @@ from mistletoe.span_token import RawText
 from mistletoe import Document
 from typing import List
 from tqdm import tqdm
-from rag_pipeline import RAGPipeline
+from rag_pipeline import RAGPipeline, is_useful_chunk
 from pathlib import Path
 from concurrent.futures.thread import ThreadPoolExecutor
 import threading
@@ -14,11 +14,13 @@ def walk_tree(node):
         return node.content + "\n"
 
     text = ""
-    if getattr(node, 'children', None):
+    children = getattr(node, 'children', None)
+    
+    if children is not None:  # Explicit None check for type checker
         if isinstance(node, CodeFence):
             text += node.language + "\n"
-        for le in node.children:
-            text += walk_tree(le)
+        for child in children:  # Use the variable, not node.children
+            text += walk_tree(child)
 
     return text
 
@@ -36,7 +38,13 @@ class MarkdownChunker:
 
         chunks = list()
         chunk = ""
-        for node in doc.children:
+
+        children = getattr(doc, 'children', None)
+        if children is None:
+            return []
+
+
+        for node in children:
             if isinstance(node, Heading) and node.level == 1:
                 chunk += walk_tree(node)
                 continue
@@ -68,7 +76,8 @@ class ObsidianIngestion:
             path_name = Path(file)
             file_chunks = self.chunker.chunk_file(str(path_name))
             res_dict["chunks_created"] += len(file_chunks)
-            res_dict["files_processed"] += 1
+            res_dict["files_processed"] += 1 
+
             all_chunks.extend(file_chunks)
             source_files.extend([path_name.name] * len(file_chunks))
 
@@ -77,7 +86,7 @@ class ObsidianIngestion:
         return res_dict
 
     def _batch_embed_and_add(self, chunks: List[str], source_files: List[str]):
-        valid_chunks = [c for c in chunks if c and c.strip()]
+        valid_chunks = [c for c in chunks if c and c.strip() and is_useful_chunk(c)]
         valid_sources = [source_files[i] for i in range(
             len(chunks)) if chunks[i] and chunks[i].strip()]
 
@@ -117,13 +126,11 @@ def debug_query_with_ids(rag: RAGPipeline, query: str, top_k: int = 6) -> list:
 
     for result in results:
         chunk_id = result.index
-        chunk_text = rag.doc_store.get_document(chunk_id)
-        
-        '''
+        chunk_text = rag.doc_store.get_document(chunk_id) 
+
         print(f"Chunk ID: {chunk_id} | Similarity: {result.similarity:.4f}")
         print(chunk_text)
         print()
-        '''
 
     result_ids = [res.index for res in results]
     return result_ids
@@ -142,5 +149,5 @@ if __name__ == "__main__":
     print(stats)
 
     # Verify it worked
-    query = "What are some advanced ways in which I could improve a RAG Pipeline?"
+    query = "Why is vector similarity search important in a RAG Pipeline?"
     debug_query_with_ids(rag, query, top_k=12)    

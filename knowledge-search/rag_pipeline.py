@@ -20,22 +20,34 @@ class RAGPipeline:
         assert doc_id == vec_idx
         return doc_id
 
-    def query(self, question: str, top_k: int = 3) -> dict:
+    def query(self, question: str, top_k: int = 20) -> dict:
         embedded_question = self.embed_gen.embed_text(question)
         results = self.vec_store.search(embedded_question, top_k)
-
         retrieved_docs = [item.index for item in results]
-
         retrieved_texts = self.doc_store.get_documents(retrieved_docs)
-        answer = ""
+
+        id_text_pairs = [
+            (doc_id, text)
+            for doc_id, text in zip(retrieved_docs, retrieved_texts)
+        ]
+
+        if not id_text_pairs:
+            return {
+                "answer": "No relevant information found after filtering.",
+                "context": [],
+                "chunk_ids": [],
+                "query": question
+            }
+        # ... LLM call stays same but use top_6_texts ...
+        top_6_pairs = id_text_pairs[:6]
+        top_6_ids = [doc_id for doc_id, _ in top_6_pairs]
+        top_6_texts = [text for _, text in top_6_pairs]
+        context = "\n\n".join(top_6_texts)
 
         system_prompt = """
         You are a helpful assistant.
         Answer questions based on the provided context.
         """
-
-        # Build context from retrieved documents
-        context = "\n\n".join(retrieved_texts)
 
         user_message = f"""Context:
         {context}
@@ -54,13 +66,37 @@ class RAGPipeline:
             ]
         )
 
-        if not retrieved_texts:
-            answer = "I don't have any relevant information to answer that question."
-        else:
-            answer = response.choices[0].message.content
-
         return {
-            "answer": answer,
-            "context": retrieved_texts,  # The list of chunk strings
+            "answer": response.choices[0].message.content,
+            "context": top_6_texts,
+            "chunk_ids": top_6_ids,
             "query": question
         }
+
+def is_useful_chunk(chunk_text: str) -> bool:
+    """Filter out metadata and sparse chunks"""
+     
+    # 1. Skip YAML frontmatter and property sections
+    if ': ' in chunk_text:
+        chunk_text = chunk_text.split(': ', 1)[1]
+    
+    # Now filters work correctly
+    if chunk_text.strip().startswith('---'):
+        return False
+
+    # 2. Minimum content threshold (test 80, 100, 150 chars)
+    if len(chunk_text.strip()) < 100:  # Increase from 40
+        return False
+
+    # 3. Skip mostly-bullets with little prose
+    lines = chunk_text.split('\n')
+    bullet_lines = sum(1 for l in lines if l.strip().startswith(('-', '*', '+')))
+    if bullet_lines / max(len(lines), 1) > 0.7:  # >70% bullets
+        return False
+     
+    # 4. Require some alphabetic content (not just punctuation/numbers)
+    alpha_chars = sum(c.isalpha() for c in chunk_text)
+    if alpha_chars < 50:  # At least 50 letters
+        return False
+    
+    return True
