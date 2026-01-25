@@ -149,5 +149,8 @@ if __name__ == "__main__":
     print(stats)
 
     # Verify it worked
-    query = "Why is vector similarity search important in a RAG Pipeline?"
-    debug_query_with_ids(rag, query, top_k=12)    
+    query = "How do I go to Mars?"
+    # debug_query_with_ids(rag, query, top_k=12)    
+    res = rag.query(query, top_k=6)
+    answer = res["answer"]
+    print(f"ANSWER: {answer}")
