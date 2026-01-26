@@ -1,7 +1,8 @@
 [workspace]
-members = [
+members = ["agent-runtime",
     "knowledge-search",
-    # Future: "agent-runtime", "tools", etc.
+    "agent-runtime", 
+    # Future: "tools", etc.
 ]
 resolver = "2"
 
