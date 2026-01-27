@@ -6,8 +6,9 @@ version = 4
 name = "agent-runtime"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "async-trait",
+ "pyo3",
+ "serde",
  "thiserror",
  "tokio",
 ]

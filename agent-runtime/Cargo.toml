@@ -1,0 +1,14 @@
+[package]
+name = "agent-runtime"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = {workspace = true}
+serde = {workspace = true}
+pyo3 = {version = "0.27.2", features = ["auto-initialize"]}
+thiserror = "2.0"
+async-trait = "0.1"
+
+[lints]
+workspace = true
